@@ -11,7 +11,7 @@ FILE_ROOT = os.getcwd()
 def main():
     radius = 8
     offset = 0  # 0~63
-    original_img = cv2.imread('./lightfield-images/lfc-dragons.dgauss-1200.tiff')
+    original_img = cv2.imread('./lightfield-images/lfc-dragons.telephoto-1200.tiff')
 
     size = 150, 150, 3
     m = np.zeros(size, dtype=np.uint8)
