@@ -4,17 +4,15 @@ import sys
 import cv2
 import os
 import numpy as np
+import progressbar
 
 def extract_subaperture_images(radius, file_path):
     offset = 0  # 0~63
     original_img = cv2.imread(file_path)
 
     size = original_img.shape[0]/radius, original_img.shape[1]/radius, 3
-    print(size)
     m = np.zeros(size, dtype=np.uint8)
 
-    # cv2.imshow('gt', original_img)
-    # cv2.waitKey(0)
     while offset < radius**2:
         for y in range(m.shape[0]):
             for x in range(m.shape[1]):
@@ -27,28 +25,33 @@ def extract_subaperture_images(radius, file_path):
         print('Saving file ' + save_file_path + ' done.')
         offset += 1
 
-def combine_subapertures(radius, file_path, shift=0):
+def combine_subapertures(radius, file_path, alpha=0):
     original_img = cv2.imread(file_path)
 
     size = original_img.shape[0]/radius, original_img.shape[1]/radius, 3
-    print(size)
     m = np.zeros(size, dtype=np.uint8)
 
+    bar = progressbar.ProgressBar(maxval=m.shape[0], widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
+    bar.start()
+    
     for y in range(m.shape[0]):
         for x in range(m.shape[1]):
-            pixel_sum = [0,0,0]
+            pixel_sum = [0, 0, 0]
             for offsetY in range(radius):
                 for offsetX in range(radius):
                     pixel_sum[0] += original_img[radius * y + offsetY][radius * x + offsetX][0]
                     pixel_sum[1] += original_img[radius * y + offsetY][radius * x + offsetX][1]
                     pixel_sum[2] += original_img[radius * y + offsetY][radius * x + offsetX][2]
-            pixel_sum[0] /= 64
-            pixel_sum[1] /= 64
-            pixel_sum[2] /= 64
+            pixel_sum[0] /= radius**2
+            pixel_sum[1] /= radius**2
+            pixel_sum[2] /= radius**2
             m[y][x] = pixel_sum
+        
+        bar.update(y+1)
 
     save_file_path = os.path.join('refocused', 'combine.png')
     cv2.imwrite(save_file_path, m)
+    bar.finish()
     print('Saving file ' + save_file_path + ' done.')
 
 
