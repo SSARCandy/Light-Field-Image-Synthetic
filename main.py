@@ -5,11 +5,12 @@ import cv2
 import os
 import numpy as np
 
-def main(radius, file_path):
+def extract_subaperture_images(radius, file_path):
     offset = 0  # 0~63
     original_img = cv2.imread(file_path)
 
-    size = 150, 150, 3
+    size = original_img.shape[0]/radius, original_img.shape[1]/radius, 3
+    print(size)
     m = np.zeros(size, dtype=np.uint8)
 
     # cv2.imshow('gt', original_img)
@@ -19,12 +20,37 @@ def main(radius, file_path):
             for x in range(m.shape[1]):
                 offsetX = offset % radius
                 offsetY = offset / radius
-                m[y][x] = original_img[radius * y + offsetX][radius * x + offsetY]
+                m[y][x] = original_img[radius * y + offsetY][radius * x + offsetX]
 
-        save_file_path = os.path.join('refocused', 'refocus-' + `offsetX` + '_' + `offsetY` + '.tiff')
+        save_file_path = os.path.join('refocused', 'refocus-' + `offsetX` + '_' + `offsetY` + '.png')
         cv2.imwrite(save_file_path, m)
         print('Saving file ' + save_file_path + ' done.')
         offset += 1
+
+def combine_subapertures(radius, file_path, shift=0):
+    original_img = cv2.imread(file_path)
+
+    size = original_img.shape[0]/radius, original_img.shape[1]/radius, 3
+    print(size)
+    m = np.zeros(size, dtype=np.uint8)
+
+    for y in range(m.shape[0]):
+        for x in range(m.shape[1]):
+            pixel_sum = [0,0,0]
+            for offsetY in range(radius):
+                for offsetX in range(radius):
+                    pixel_sum[0] += original_img[radius * y + offsetY][radius * x + offsetX][0]
+                    pixel_sum[1] += original_img[radius * y + offsetY][radius * x + offsetX][1]
+                    pixel_sum[2] += original_img[radius * y + offsetY][radius * x + offsetX][2]
+            pixel_sum[0] /= 64
+            pixel_sum[1] /= 64
+            pixel_sum[2] /= 64
+            m[y][x] = pixel_sum
+
+    save_file_path = os.path.join('refocused', 'combine.png')
+    cv2.imwrite(save_file_path, m)
+    print('Saving file ' + save_file_path + ' done.')
+
 
 
 if __name__ == '__main__':
@@ -34,7 +60,9 @@ if __name__ == '__main__':
 
     file_path = sys.argv[1]
     radius = int(sys.argv[2])
-    main(radius, file_path)
+    combine_subapertures(radius, file_path)
 
-# python main.py .\lightfield-images\lfc-dragons.dgauss-1200.tiff 8
-# python main.py .\lightfield-images\lfc-dragons.telephoto-1200.tiff 8
+# python main.py .\lightfield-images\lfc-dgauss-1200-150.tiff 8
+# python main.py .\lightfield-images\lfc-telephoto-1200-150.tiff 8
+# python main.py .\lightfield-images\lfc-telephoto-3600-450.tiff 8
+# python main.py .\lightfield-images\lfc-dgauss-1200-400.tiff 3
