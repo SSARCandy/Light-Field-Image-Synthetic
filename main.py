@@ -89,7 +89,7 @@ def load_subapertures_from_dir(dir_path):
   
 
 def combine_subapertures2(dir_path='./refocused/dgauss-subapertures/', shift=0, radius=8):
-    subpaertures = load_subapertures_from_dir(dir_path)
+    subapertures = load_subapertures_from_dir(dir_path)
 
     m = np.zeros(subapertures[0][0].shape, dtype=np.float32)
     for y in range(len(subapertures)):
@@ -113,8 +113,8 @@ def combine_subapertures2(dir_path='./refocused/dgauss-subapertures/', shift=0, 
             sub_img = cv2.copyMakeBorder(subapertures[y][x], padding[0], padding[1], padding[2], padding[3], cv2.BORDER_CONSTANT, (255, 255, 255))
             sub_img = sub_img[padding[1]:m.shape[0]+padding[1], padding[3]:m.shape[1]+padding[3]]
 
-            # cv2.imshow('hhhh', sub_img)
-            # cv2.waitKey(0)
+            cv2.imshow('hhhh', sub_img)
+            cv2.waitKey(0)
             cv2.accumulateWeighted(sub_img, m, 1/float(radius**2))
     
     m = cv2.normalize(m, None, 0, 255, cv2.NORM_MINMAX, 0)
@@ -137,9 +137,9 @@ if __name__ == '__main__':
     radius = int(sys.argv[2])
     # combine_subapertures(radius, file_path)
     # extract_subaperture_images(radius, file_path)
-    for i in range(-4,5,1):
-        combine_subapertures2('./refocused/dgauss-subapertures', i, radius)
-    # combine_subapertures2('./refocused/dgauss-subapertures', -1, radius)
+    # for i in range(-4,5,1):
+    #     combine_subapertures2('./refocused/rrr', i, radius)
+    combine_subapertures2('./refocused/rrr', -1, radius)
 
 '''
 python main.py .\lightfield-images\lfc-dgauss-1200-150.tiff 8
