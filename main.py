@@ -48,21 +48,83 @@ def combine_subapertures(radius, file_path, alpha=0):
     size = original_img.shape[0]/radius, original_img.shape[1]/radius, 3
     m = np.zeros(size, dtype=np.uint8)
 
-    bar = progressbar.ProgressBar(maxval=m.shape[0], widgets=[progressbar.Bar('+', 'Syntheticing: [', ']'), ' ', progressbar.ETA()])
-    bar.start()
 
-    for y in range(m.shape[0]):
-        for x in range(m.shape[1]):
-            pixel_sum = [0, 0, 0]
-            pixel_sum = integral_pixel(original_img, radius * x + radius/2, radius * y + radius/2, radius, 1)
-            m[y][x] = map(lambda x: x/radius**2, pixel_sum)
-        
-        bar.update(y+1)
+    for a in range(-10,11,1):
+        bar = progressbar.ProgressBar(maxval=m.shape[0], widgets=[progressbar.Bar('+', 'Syntheticing: [', ']'), ' ', progressbar.ETA()])
+        bar.start()
+        for y in range(m.shape[0]):
+            for x in range(m.shape[1]):
+                pixel_sum = [0, 0, 0]
+                pixel_sum = integral_pixel(original_img, radius * x + radius/2, radius * y + radius/2, radius, float(a/5.0))
+                m[y][x] = map(lambda x: x/radius**2, pixel_sum)
+            
+            bar.update(y+1)
 
-    save_file_path = os.path.join('refocused', 'combine.png')
+        save_file_path = os.path.join('refocused', 'combine_'+`float(a/5.0)`+'.png')
+        cv2.imwrite(save_file_path, m)
+        bar.finish()
+        print('Saving file to "' + save_file_path + '" done.')
+
+def load_subapertures_from_dir(dir_path):
+    imgs = os.listdir(dir_path)
+    
+    subapertures = []
+    tmp = []
+    for i in range(len(imgs)):
+        if i % radius == 0 and i > 0:
+            subapertures.append(tmp)
+            tmp = []
+        sub_img = cv2.imread(os.path.join(dir_path, imgs[i]))
+        sub_img = cv2.normalize(sub_img.astype('float32'), None, 0.0, 1.0, cv2.NORM_MINMAX)
+        tmp.append(sub_img)
+    subapertures.append(tmp)
+
+    # for i in range(len(subapertures)):
+    #     for j in range(len(subapertures[i])):
+    #         print((i, j))
+    #         cv2.imshow('y', subapertures[i][j])
+    #         cv2.waitKey(0)
+
+    return subapertures
+  
+
+def combine_subapertures2(dir_path='./refocused/dgauss-subapertures/', shift=0, radius=8):
+    subpaertures = load_subapertures_from_dir(dir_path)
+
+    m = np.zeros(subapertures[0][0].shape, dtype=np.float32)
+    for y in range(len(subapertures)):
+        for x in range(len(subapertures[y])):
+            padding = [0, 0, 0, 0] # top, bottom, left, right
+            middle = (radius/2.0) if radius % 2 == 0 else (radius-1)/2.0
+            if x - middle < 0:
+                padding[2] = abs(shift*int(x - middle-0.5))
+            if x - middle > 0:
+                padding[3] = abs(shift*int(x - middle+0.5))
+            if y - middle < 0:
+                padding[0] = abs(shift*int(y - middle-0.5))
+            if y - middle > 0:
+                padding[1] = abs(shift*int(y - middle+0.5))
+
+            if shift < 0:
+                padding[1], padding[0] = padding[0], padding[1]
+                padding[3], padding[2] = padding[2], padding[3]
+            print(padding)
+
+            sub_img = cv2.copyMakeBorder(subapertures[y][x], padding[0], padding[1], padding[2], padding[3], cv2.BORDER_CONSTANT, (255, 255, 255))
+            sub_img = sub_img[padding[1]:m.shape[0]+padding[1], padding[3]:m.shape[1]+padding[3]]
+
+            # cv2.imshow('hhhh', sub_img)
+            # cv2.waitKey(0)
+            cv2.accumulateWeighted(sub_img, m, 1/float(radius**2))
+    
+    m = cv2.normalize(m, None, 0, 255, cv2.NORM_MINMAX, 0)
+    filename = `shift` if shift < 0 else '+' + `shift`
+    save_file_path = os.path.join('refocused',  filename + 'refocus.png')
     cv2.imwrite(save_file_path, m)
-    bar.finish()
     print('Saving file to "' + save_file_path + '" done.')
+    
+
+            
 
 
 
@@ -73,11 +135,15 @@ if __name__ == '__main__':
 
     file_path = sys.argv[1]
     radius = int(sys.argv[2])
-    combine_subapertures(radius, file_path)
-    extract_subaperture_images(radius, file_path)
+    # combine_subapertures(radius, file_path)
+    # extract_subaperture_images(radius, file_path)
+    for i in range(-4,5,1):
+        combine_subapertures2('./refocused/dgauss-subapertures', i, radius)
+    # combine_subapertures2('./refocused/dgauss-subapertures', -1, radius)
 
 '''
 python main.py .\lightfield-images\lfc-dgauss-1200-150.tiff 8
+python main.py .\lightfield-images\lfc-dgauss-500-100.tiff 5
 python main.py .\lightfield-images\lfc-dgauss-dragons-1200-150.tiff 8
 python main.py .\lightfield-images\lfc-dgauss-dragons2-1200-150.tiff 8
 python main.py .\lightfield-images\lfc-dgauss-dragons-1360-80.tiff 17
