@@ -3,8 +3,11 @@
 import sys
 import cv2
 import os
+import math
 import numpy as np
 import progressbar
+import multiprocessing
+from joblib import Parallel, delayed
 
 def integral_pixel(original_img, middle_x, middle_y, radius, shift=1):
     integral = [0, 0, 0]
@@ -65,7 +68,7 @@ def combine_subapertures(radius, file_path, alpha=0):
         bar.finish()
         print('Saving file to "' + save_file_path + '" done.')
 
-def load_subapertures_from_dir(dir_path):
+def load_subapertures_from_dir(dir_path, radius):
     imgs = os.listdir(dir_path)
     
     subapertures = []
@@ -125,6 +128,48 @@ def combine_subapertures2(dir_path='./refocused/dgauss-subapertures/', shift=0, 
     
 
             
+def digital_refocus(dir_path, radius=8, alpha=1):
+    subapertures = load_subapertures_from_dir(dir_path, radius)
+
+    width = subapertures[0][0].shape[0]*radius
+    lenses = width/radius
+    m = np.zeros((lenses, lenses, 3), dtype=np.float32)
+
+    # bar = progressbar.ProgressBar(maxval=radius**2, widgets=[progressbar.Bar('+', 'Syntheticing: [', ']'), ' ', progressbar.ETA()])
+    # bar.start()
+
+    for i in range(0, radius, 1):
+        for j in range(1, radius+1, 1):
+            u = (-(radius/2.0) + i) / (radius/2.0) + (1 / float(radius))
+            v = (-(radius/2.0) + j) / (radius/2.0) + (1 / float(radius))
+            shift_x = u * (1 - 1.0 / alpha)
+            shift_y = v * (1 - 1.0 / alpha)
+
+            for y in range(lenses):
+                for x in range(lenses):
+                    xToSample = int(x - shift_x * float(lenses) + 0.5)
+                    yToSample = int(y - shift_y * float(lenses) + 0.5)
+                    if xToSample < lenses and xToSample >= 0 and yToSample < lenses and yToSample >= 0:
+                        m[y][x] += subapertures[i][j-1][yToSample][xToSample]
+
+            print('alpha='+('%.4f' % alpha) + ': '+`int((i*radius+j)/float(radius**2)*100)` + '%')
+    #         bar.update(i*radius+j)
+    # bar.finish()
+
+
+    for i in range(len(m)):
+        for j in range(len(m[i])):
+            m[i][j] = m[i][j]/float(radius**2)
+    
+    # cv2.imshow('hhhh', m)
+    # cv2.waitKey(0)
+    m = cv2.normalize(m, None, 0, 255, cv2.NORM_MINMAX, 0)
+    save_file_path = os.path.join('refocused',  ('%.4f' % alpha) + '_refocus.png')
+    cv2.imwrite(save_file_path, m)
+    print('Saving file to "' + save_file_path + '" done.')
+    return m
+
+
 
 
 
@@ -139,7 +184,16 @@ if __name__ == '__main__':
     # extract_subaperture_images(radius, file_path)
     # for i in range(-4,5,1):
     #     combine_subapertures2('./refocused/rrr', i, radius)
-    combine_subapertures2('./refocused/rrr', -1, radius)
+    # combine_subapertures2('./refocused/rrr', -1, radius)
+
+    num_cores = multiprocessing.cpu_count()
+    print('Detect ' + `num_cores` + ' cores')
+
+    alpha_arr = np.arange(0.96, 1.04, 0.0025)
+
+    results = Parallel(n_jobs=num_cores, verbose=50)(delayed(digital_refocus)('./refocused/dgauss-subapertures', 8, i) for i in alpha_arr)
+
+
 
 '''
 python main.py .\lightfield-images\lfc-dgauss-1200-150.tiff 8
